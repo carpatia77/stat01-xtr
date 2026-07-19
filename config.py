@@ -1,13 +1,19 @@
 """
 config.py — listas de ativos, aliases, classes, datas
 """
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
+import os
 
 # ── Datas ──────────────────────────────────────────────────────────────────────
 # Fixado em 2026-07-17 para bater com os reports_originais/ usados como
 # referência de regressão. Para gerar reports novos em outra data, sobrescreva
 # REPORT_DATE (ex.: variável de ambiente) antes de importar este módulo.
-REPORT_DATE = date(2026, 7, 17)
+env_date = os.environ.get("GARCH_REPORT_DATE")
+if env_date:
+    REPORT_DATE = datetime.strptime(env_date, "%Y-%m-%d").date()
+else:
+    REPORT_DATE = date(2026, 7, 17)
+
 END_DATE    = REPORT_DATE
 START_DATE  = END_DATE - timedelta(days=1460)  # 4 anos corridos
 

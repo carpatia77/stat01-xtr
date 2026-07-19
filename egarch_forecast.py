@@ -63,8 +63,8 @@ def run(tickers: list[str] | None = None, save: bool = False,
     resultados = [forecast_one(t, dist=dist) for t in tickers]
     report = render_report2(resultados)
     if save:
-        from datetime import date
-        fname = f"EGARCH_FORECAST_{date.today()}.txt"
+        from config import REPORT_DATE
+        fname = f"EGARCH-TSTUDENT(1.1)-t_{REPORT_DATE}.txt"
         with open(fname, "w", encoding="utf-8") as fh:
             fh.write(report)
         print(f"[egarch_forecast] Salvo em {fname}")

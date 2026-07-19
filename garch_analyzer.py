@@ -135,8 +135,8 @@ def run(assets: list[tuple] | None = None, save: bool = False) -> str:
 
     report = render_report1(resultados)
     if save:
-        from datetime import date
-        fname = f"ANALISE_GARCH_COMPLETO_{date.today()}.txt"
+        from config import REPORT_DATE
+        fname = f"ANALISE_GARCH_COMPLETO_{REPORT_DATE}.txt"
         with open(fname, "w", encoding="utf-8") as fh:
             fh.write(report)
         print(f"[garch_analyzer] Salvo em {fname}")
