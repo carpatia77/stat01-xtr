@@ -3,6 +3,7 @@ data.py — download via yfinance + retornos log
 Usa cache em CSV para garantir determinismo nos testes de regressão.
 """
 import os
+from datetime import timedelta
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -26,8 +27,12 @@ def get_prices(ticker: str, force_download: bool = False) -> pd.Series:
     if os.path.exists(path) and not force_download:
         px = pd.read_csv(path, index_col=0, parse_dates=True).squeeze()
     else:
-        raw = yf.download(ticker, start=START_DATE, end=END_DATE,
-                          auto_adjust=True, progress=False)
+        # end é exclusivo no yfinance: soma 1 dia para incluir END_DATE
+        # (2026-07-17) na série, como no report original.
+        # auto_adjust=False: usa Close bruto, não ajustado por dividendos —
+        # os "Fechamentos Anteriores" do Report 2 são preços crus.
+        raw = yf.download(ticker, start=START_DATE, end=END_DATE + timedelta(days=1),
+                          auto_adjust=False, progress=False)
         if raw.empty:
             raise ValueError(f"Sem dados para {ticker}")
         px = raw["Close"].squeeze().dropna()
