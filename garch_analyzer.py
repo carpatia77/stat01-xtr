@@ -53,13 +53,65 @@ def _extract_params(res) -> tuple[float, float, float, float]:
     return omega, alpha, beta, gamma
 
 
+def _sane(res, dist, ret_scale) -> bool:
+    """Guarda de sanidade compartilhada: rejeita fits 'tecnicamente bem
+    sucedidos' mas numericamente degenerados (o otimizador não levanta
+    exceção ao pousar num limite/mínimo ruim, só emite warning)."""
+    if getattr(res, "convergence_flag", 0) != 0:
+        return False  # scipy reportou não-convergência real
+    mu_val = float(res.params.get("mu", 0.0))
+    if ret_scale > 0 and abs(mu_val) > 10 * ret_scale:
+        return False  # média disparada — sinal de otimização perdida
+    # "nu" tem significado DIFERENTE por distribuição no `arch`: em t/skewt
+    # é grau de liberdade (deve ser > 2 p/ variância finita — nu perto de 2
+    # ou muito alto É degenerado). No GED, "nu" é o parâmetro de FORMA/
+    # curtose — nu < 2 é um resultado LEGÍTIMO (caudas mais pesadas que a
+    # normal, a própria razão de escolher GED).
+    nu_val = res.params.get("nu")
+    if nu_val is not None and dist in ("t", "skewt") and not (2.05 <= nu_val <= 90):
+        return False  # graus de liberdade grudados no limite do otimizador
+    lam_val = res.params.get("lambda")
+    if lam_val is not None and abs(lam_val) > 0.995:
+        return False  # assimetria da Skewed-t grudada no limite ±1
+    return True
+
+
+def _warm_start_vector(anchor_params, p: int, o: int, q: int):
+    """
+    Monta o vetor de partida para um candidato GARCH(p,q)/GJR-GARCH(p,q)
+    a partir do fit-âncora GARCH(1,1) do mesmo `dist`, preenchendo com 0
+    as defasagens extras (alpha[2..p], beta[2..q]) e o(s) gamma[1..o] do
+    GJR. Ordem confirmada empiricamente contra o `arch`:
+    mu, omega, alpha[1..p], gamma[1..o], beta[1..q], <params de forma>.
+
+    Sem isso, o SciPy (nesta versão do `arch`) some no vazio pra p>1 ou
+    q>1: fica cego sem um chute inicial perto da solução e converge pra
+    um mínimo local muito pior (confirmado no ^BVSP: GARCH(1,2) sem
+    warm-start cai em AIC=-3279; com warm-start do GARCH(1,1), AIC=-6287,
+    batendo o valor histórico do report original).
+    """
+    shape_names = [n for n in anchor_params.index if n not in ("mu", "omega", "alpha[1]", "beta[1]")]
+    vec = [float(anchor_params["mu"]), float(anchor_params["omega"]), float(anchor_params["alpha[1]"])]
+    vec += [0.0] * (p - 1)                                    # alpha[2..p]
+    vec += [0.0] * o                                          # gamma[1..o] (GJR)
+    vec += [float(anchor_params["beta[1]"])] + [0.0] * (q - 1)  # beta[1..q]
+    vec += [float(anchor_params[n]) for n in shape_names]
+    return np.array(vec)
+
+
 def fit_grid(ret, alias: str, classe: str) -> dict | None:
     """
     Testa toda a grade (GRID × DISTS), aplica critério LB/AIC,
     devolve dict pronto para render_report1.
+
+    Para a família GARCH/GJR (o<=1), usa warm-start em cascata: ajusta
+    GARCH(1,1) primeiro por distribuição e usa o resultado como chute
+    inicial dos modelos de ordem maior — necessário pra evitar que o
+    otimizador se perca em superfícies com p>1 ou q>1 (ver _warm_start_vector).
     """
     candidatos = []
     ret_scale = float(ret.std())
+    ancoras: dict[str, "object"] = {}  # dist -> res do GARCH(1,1) (se sadio)
 
     for (vol, p, o, q) in GRID:
         for dist in DISTS:
@@ -69,32 +121,21 @@ def fit_grid(ret, alias: str, classe: str) -> dict | None:
                     p=p, o=o, q=q, dist=dist,
                     rescale=False,  # ESSENCIAL: manter retornos sem reescala
                 )
-                res = am.fit(disp="off", show_warning=False)
 
-                # --- guarda de sanidade: rejeita fits "tecnicamente bem
-                # sucedidos" mas numericamente degenerados (o optimizer não
-                # levanta exceção quando pousa num limite/mínimo ruim, só
-                # emite warning — que o except abaixo nunca pegaria).
-                if getattr(res, "convergence_flag", 0) != 0:
-                    continue  # scipy reportou não-convergência real
-                mu_val = float(res.params.get("mu", 0.0))
-                if ret_scale > 0 and abs(mu_val) > 10 * ret_scale:
-                    continue  # média disparada — sinal de otimização perdida
-                # "nu" tem significado DIFERENTE por distribuição no `arch`:
-                # em t/skewt é grau de liberdade (deve ser > 2 p/ variância
-                # finita — nu perto de 2 ou muito alto É degenerado).
-                # No GED, "nu" é o parâmetro de FORMA/curtose — nu < 2 é um
-                # resultado LEGÍTIMO (caudas mais pesadas que a normal, a
-                # própria razão de escolher GED). Aplicar o limite do t/skewt
-                # ao GED rejeitava fits válidos e forçava fallback pra Normal
-                # sistematicamente (confirmado: causava ΔAIC positivo em
-                # ~10 ativos no backtest de 07-14/07-15).
-                nu_val = res.params.get("nu")
-                if nu_val is not None and dist in ("t", "skewt") and not (2.05 <= nu_val <= 90):
-                    continue  # graus de liberdade grudados no limite do otimizador
-                lam_val = res.params.get("lambda")
-                if lam_val is not None and abs(lam_val) > 0.995:
-                    continue  # assimetria da Skewed-t grudada no limite ±1
+                sv = None
+                if vol == "GARCH" and (p, o, q) != (1, 0, 1) and dist in ancoras:
+                    sv = _warm_start_vector(ancoras[dist].params, p, o, q)
+
+                if sv is not None:
+                    res = am.fit(disp="off", show_warning=False, starting_values=sv)
+                else:
+                    res = am.fit(disp="off", show_warning=False)
+
+                if not _sane(res, dist, ret_scale):
+                    continue
+
+                if vol == "GARCH" and (p, o, q) == (1, 0, 1):
+                    ancoras[dist] = res  # guarda a âncora sadia pra próxima iteração
 
                 lb_pval = float(
                     acorr_ljungbox(res.std_resid.dropna()**2, lags=[LB_LAG])["lb_pvalue"].iloc[0]
