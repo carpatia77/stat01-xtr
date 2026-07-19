@@ -258,3 +258,20 @@ caractere a caractere contra `reports_originais/` (teste de regressão abaixo).
   ES, JPY, NZDUSD, USDBRL, CHF, AUDNZD — todos com ΔAIC positivo/pior e padrão
   "GED → Normal"), derrubando a taxa de acerto do backtest de 19/34→10/31.
   **Corrigido**: o teste de `nu` só se aplica quando `dist in ("t", "skewt")`.
+
+- **Backtest final (com os dois fixes acima) reproduz exatamente a mesma
+  taxa e o mesmo conjunto de ativos "falhos" da primeira execução (19/31 no
+  dia 14, 16/31 no dia 15)** — confirma que as guardas de sanidade têm efeito
+  cirúrgico (só corrigem os fits realmente degenerados, sem tocar no resto).
+  Restam ~5 divergências reais por dia (|ΔAIC|>15, não são empate técnico):
+  `6E`, `EURUSD`, `EWZ`, e principalmente **`DIA`/`YM` trocando pra
+  GJR-GARCH(1,1) nos dois dias consecutivos**. `YM` e `DIA` são os dois
+  instrumentos ligados ao Dow Jones (futuro e ETF do mesmo índice) — segundo
+  o usuário, é o ativo que o autor original opera de fato ao vivo. Hipótese
+  mais provável: a grade/seleção dele não é 100% a regra documentada (AIC+LB)
+  pros ativos que ele realmente opera — pode ter override manual ou grade
+  diferente pro YM especificamente, validado empiricamente por performance
+  em trading real, não pelo critério estatístico puro do report.
+  **Decisão do usuário**: manter o motor fiel à regra documentada (AIC+LB),
+  sem exceção manual pra YM/DIA — a divergência nesses dois ativos fica
+  documentada como desvio conhecido do autor, não como bug da reconstrução.
