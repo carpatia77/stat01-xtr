@@ -121,6 +121,9 @@ def run(assets: list[tuple] | None = None, save: bool = False) -> str:
     assets = assets or ASSETS_R1
     resultados = []
     for alias, ticker, classe in assets:
+        if ticker is None:
+            print(f"    [SKIP] {alias}: ticker Yahoo não identificado (ver config.py)")
+            continue
         print(f"  Processando {alias} ({ticker}) ...", flush=True)
         try:
             _, ret = get_returns(ticker, scale100=False)

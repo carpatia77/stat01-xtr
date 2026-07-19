@@ -25,22 +25,45 @@ def _strip(text: str) -> list[str]:
     return [ln for ln in text.splitlines() if not IGNORE_PATTERN.search(ln)]
 
 
+# Linha de dado = começa com token não-vazio e tem colunas suficientes.
+# Ignora separadores (===), bullets (•) e blocos de texto estático.
+_DATA_ROW = re.compile(r"^\S+\s+\S.*\s+(EXCELENTE|BOM|RUIM|Sucesso|Erro)")
+
+
+def _index_by_key(lines: list[str]) -> dict[str, str]:
+    """Indexa linhas de dado pelo 1º token (ativo/ticker)."""
+    d = {}
+    for ln in lines:
+        if _DATA_ROW.search(ln):
+            d[ln.split()[0]] = ln
+    return d
+
+
 def diff_report(generated: str, ref_path: Path) -> list[str]:
+    """
+    Compara chaveando por ativo (robusto a linhas faltando/reordenadas), em vez
+    de zip() posicional — uma linha ausente não cascateia para todas as
+    seguintes. Reporta ativos só-no-ref, só-no-gerado e valores divergentes.
+    """
     if not ref_path.exists():
         return [f"AVISO: arquivo de referência não encontrado: {ref_path}"]
     ref_text = ref_path.read_text(encoding="utf-8")
-    gen_lines = _strip(generated)
-    ref_lines = _strip(ref_text)
+    gen = _index_by_key(_strip(generated))
+    ref = _index_by_key(_strip(ref_text))
+
     diffs = []
-    for i, (g, r) in enumerate(zip(gen_lines, ref_lines), 1):
-        if g != r:
-            diffs.append(f"  Linha {i:4d}:")
-            diffs.append(f"    GERADO : {repr(g)}")
-            diffs.append(f"    REF    : {repr(r)}")
-    if len(gen_lines) != len(ref_lines):
-        diffs.append(
-            f"  AVISO: gerado={len(gen_lines)} linhas, ref={len(ref_lines)} linhas"
-        )
+    faltando = sorted(set(ref) - set(gen))
+    sobrando = sorted(set(gen) - set(ref))
+    if faltando:
+        diffs.append(f"  AUSENTES no gerado ({len(faltando)}): {', '.join(faltando)}")
+    if sobrando:
+        diffs.append(f"  EXTRAS no gerado ({len(sobrando)}): {', '.join(sobrando)}")
+
+    for key in ref:
+        if key in gen and gen[key] != ref[key]:
+            diffs.append(f"  [{key}]")
+            diffs.append(f"    GERADO : {gen[key]!r}")
+            diffs.append(f"    REF    : {ref[key]!r}")
     return diffs
 
 

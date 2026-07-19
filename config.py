@@ -51,8 +51,11 @@ ASSETS_R1 = [
     ("NVDA",     "NVDA",      "AÇÃO"),
     ("NZDUSD",   "NZDUSD=X",  "AÇÃO"),   # mapeado como AÇÃO no original
     ("TSLA",     "TSLA",      "AÇÃO"),
-    ("USDX",     "DX=F",      "FUTUROS"), # futuro do índice dólar — DX-Y.NYB já usado pelo alias "DX-Y.NYB"
-    ("XAF",      None,        "FUTUROS"), # TODO: ticker não identificado — calibrar pelo AIC (-6368.7) contra candidatos
+    ("USDX",     None,        "AÇÃO"),    # TODO: ticker não identificado. DX=F dá 404 (delisted no Yahoo);
+                                          # DX-Y.NYB já é do alias "DX-Y.NYB" e tem AIC diferente.
+                                          # Referência: GARCH(1,1) GED, AIC=-6633.1 (α/β travados em 0.20/0.70)
+    ("XAF",      None,        "FUTUROS"), # TODO: ticker não identificado.
+                                          # Referência: EGARCH(1,1,1) Skewed t, AIC=-6368.7
     ("^BVSP",    "^BVSP",     "AÇÃO"),
     ("^VIX",     "^VIX",      "AÇÃO"),
     ("^VVIX",    "^VVIX",     "AÇÃO"),
