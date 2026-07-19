@@ -76,27 +76,29 @@ def _sane(res, dist, ret_scale) -> bool:
     return True
 
 
-def _warm_start_vector(anchor_params, p: int, o: int, q: int):
+def _warm_start_vector(am, anchor_params):
     """
-    Monta o vetor de partida para um candidato GARCH(p,q)/GJR-GARCH(p,q)
-    a partir do fit-âncora GARCH(1,1) do mesmo `dist`, preenchendo com 0
-    as defasagens extras (alpha[2..p], beta[2..q]) e o(s) gamma[1..o] do
-    GJR. Ordem confirmada empiricamente contra o `arch`:
-    mu, omega, alpha[1..p], gamma[1..o], beta[1..q], <params de forma>.
+    Monta o vetor de partida para o modelo-alvo `am` casando por NOME de
+    parâmetro com o fit-âncora `anchor_params` (Series do GARCH(1,1) do
+    mesmo `dist`). Parâmetros extras que só existem no alvo (ex.:
+    alpha[2], beta[2], gamma[1] do GJR) ficam com o chute default do
+    próprio `arch`, obtido via dry-run (`maxiter=0`) — mais robusto do
+    que montar o vetor por POSIÇÃO hardcoded: não depende de premissa
+    sobre a ordem interna dos parâmetros, que pode variar por modelo/
+    distribuição/versão do `arch`.
 
-    Sem isso, o SciPy (nesta versão do `arch`) some no vazio pra p>1 ou
-    q>1: fica cego sem um chute inicial perto da solução e converge pra
-    um mínimo local muito pior (confirmado no ^BVSP: GARCH(1,2) sem
-    warm-start cai em AIC=-3279; com warm-start do GARCH(1,1), AIC=-6287,
-    batendo o valor histórico do report original).
+    Sem warm-start, o SciPy (nesta versão do `arch`) some no vazio pra
+    p>1 ou q>1: fica cego sem um chute inicial perto da solução e
+    converge pra um mínimo local muito pior (confirmado no ^BVSP:
+    GARCH(1,2) sem warm-start cai em AIC=-3279; com warm-start do
+    GARCH(1,1), AIC=-6287, batendo o valor histórico do report original).
     """
-    shape_names = [n for n in anchor_params.index if n not in ("mu", "omega", "alpha[1]", "beta[1]")]
-    vec = [float(anchor_params["mu"]), float(anchor_params["omega"]), float(anchor_params["alpha[1]"])]
-    vec += [0.0] * (p - 1)                                    # alpha[2..p]
-    vec += [0.0] * o                                          # gamma[1..o] (GJR)
-    vec += [float(anchor_params["beta[1]"])] + [0.0] * (q - 1)  # beta[1..q]
-    vec += [float(anchor_params[n]) for n in shape_names]
-    return np.array(vec)
+    probe = am.fit(disp="off", show_warning=False, options={"maxiter": 0})
+    sv = probe.params.copy()
+    for name in sv.index:
+        if name in anchor_params.index:
+            sv[name] = anchor_params[name]
+    return sv.values
 
 
 def fit_grid(ret, alias: str, classe: str) -> dict | None:
@@ -124,7 +126,10 @@ def fit_grid(ret, alias: str, classe: str) -> dict | None:
 
                 sv = None
                 if vol == "GARCH" and (p, o, q) != (1, 0, 1) and dist in ancoras:
-                    sv = _warm_start_vector(ancoras[dist].params, p, o, q)
+                    try:
+                        sv = _warm_start_vector(am, ancoras[dist].params)
+                    except Exception:
+                        sv = None  # dry-run falhou — cai pro chute default normal
 
                 if sv is not None:
                     res = am.fit(disp="off", show_warning=False, starting_values=sv)
