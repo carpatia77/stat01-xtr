@@ -15,55 +15,32 @@
 #property indicator_plots   0
 
 //======================================================================
-// === 1. Tipo de Volatilidade ===
-//======================================================================
-enum ENUM_VOL_MODE
-  {
-   VOL_CONDICIONAL,   // Vol condicional filtrada + forecast N dias
-  };
-input ENUM_VOL_MODE InpVolMode = VOL_CONDICIONAL;
-
-//======================================================================
-// === 2. Modelo Principal ===
+// === 1. Modelo ===
+// IMPORTANTE: o Report 1 (garch_analyzer.py) SEMPRE entrega Omega/Alpha/
+// Beta/Gamma já SOMADOS entre defasagens (ex.: alpha = alpha[1]+alpha[2]).
+// Ele nunca expoe a defasagem individual — entao so existe UM numero por
+// grega pra colar aqui, nao interessa o modelo. Copie as 4 colunas
+// (Ω, α, β, γ) direto da linha do ativo no .txt e selecione o Modelo que
+// aparece na mesma linha. Nao existem campos "alpha[2]"/"beta[2]" —
+// colar valores la era a causa de bandas nao-estacionarias (α+β>1) que
+// faziam o forecast explodir e nada aparecer no grafico.
 //======================================================================
 enum ENUM_MODEL
   {
-   MODEL_GARCH_PQ,    // GARCH(p,q) — sem assimetria
-   MODEL_EGARCH_PQ,   // EGARCH(p,o,q) — assimetria em log-variancia
-   MODEL_GJR_PQ,      // GJR-GARCH(p,o,q) — assimetria em nivel
+   MODEL_GARCH_PQ,    // GARCH(p,q) ou GARCH(p,q)-GJR sem gamma — sem assimetria
+   MODEL_EGARCH_PQ,   // EGARCH(p,o,q) — assimetria em log-variancia (gamma via z)
+   MODEL_GJR_PQ,      // GJR-GARCH(p,o,q) — assimetria em nivel (gamma via I(eps<0))
   };
-input ENUM_MODEL InpModel = MODEL_GARCH_PQ;
+input ENUM_MODEL InpModel = MODEL_EGARCH_PQ;
+
+input double InpOmega = -0.070664533452;  // Ω — coluna "Ω (Omega)" do report
+input double InpAlpha = 0.07253778;       // α — coluna "α (Alpha)" (já é a soma)
+input double InpBeta  = 0.99212226;       // β — coluna "β (Beta)"  (já é a soma)
+input double InpGamma = 0.00298651;       // γ — coluna "γ (Gamma)" (0 se GARCH puro)
+input ENUM_LINE_STYLE InpLineStyle = STYLE_SOLID;
 
 //======================================================================
-// === 3. GARCH(p,q) & GJR-GARCH (reaproveita Omega/Alpha/Beta) ===
-//======================================================================
-input double InpGarchOmega = 0.00000439;
-input double InpGarchAlpha = 0.031597;   // alpha[1] (+ alpha[2] abaixo se p=2)
-input double InpGarchAlpha2 = 0.0;       // alpha[2], 0 = GARCH(1,q)
-input double InpGarchBeta  = 0.950707;   // beta[1]
-input double InpGarchBeta2 = 0.0;        // beta[2], 0 = GARCH(p,1)
-input ENUM_LINE_STYLE InpGarchStyle = STYLE_SOLID;
-
-//======================================================================
-// === 4. EGARCH(p,o,q) ===
-//======================================================================
-input double InpEgarchOmega = -0.386095;
-input double InpEgarchAlpha = 0.070563;
-input double InpEgarchAlpha2 = 0.0;
-input double InpEgarchBeta  = 0.958068;
-input double InpEgarchBeta2 = 0.0;
-input double InpEgarchGamma = -0.239216;
-input double InpEgarchGamma2 = 0.0;
-input ENUM_LINE_STYLE InpEgarchStyle = STYLE_DOT;
-
-//======================================================================
-// === 5. GJR-GARCH — parametro extra (usa Omega/Alpha/Beta da secao 3)
-//======================================================================
-input double InpGJRGamma = 0.0;
-input ENUM_LINE_STYLE InpGJRStyle = STYLE_DASH;
-
-//======================================================================
-// === 6. Distribuicao (para o quantil das bandas) ===
+// === 2. Distribuicao (para o quantil das bandas) ===
 //======================================================================
 enum ENUM_DIST
   {
@@ -267,22 +244,36 @@ bool ComputeForecast(SForecast &out)
    for(int i=0; i<n; i++)
       eps[i] = MathLog(rates[i].close / rates[i+1].close);
 
-   double a1=InpGarchAlpha, a2=InpGarchAlpha2, b1=InpGarchBeta, b2=InpGarchBeta2;
-   double omega = InpGarchOmega;
-   double g1=0.0, g2=0.0;
+   // O report so entrega alpha/beta/gamma JA SOMADOS entre defasagens —
+   // nao ha granularidade de lag individual disponivel, entao a recursao
+   // usa esses totais diretamente (equivalente a colapsar qualquer
+   // GARCH(p,q) num GARCH(1,1) com a mesma persistencia agregada, que e
+   // exatamente o que a interpretacao automatica do proprio report ja
+   // assume ao resumir "alpha total"/"beta total").
+   double omega = InpOmega, aSum = InpAlpha, bSum = InpBeta, gSum = InpGamma;
+   double Eabsz = ExpectedAbsZ();
 
+   // --- guarda de estacionariedade: sem isso o forecast explode em      ---
+   // --- silencio (sigma vira NaN/Inf) e nenhuma linha aparece no grafico.
+   bool valid = true;
+   string reason = "";
    if(InpModel == MODEL_EGARCH_PQ)
      {
-      omega = InpEgarchOmega; a1=InpEgarchAlpha; a2=InpEgarchAlpha2;
-      b1=InpEgarchBeta; b2=InpEgarchBeta2; g1=InpEgarchGamma; g2=InpEgarchGamma2;
+      if(MathAbs(bSum) >= 1.0) { valid=false; reason=StringFormat("EGARCH nao-estacionario: |beta|=%.4f >= 1", bSum); }
      }
-   else if(InpModel == MODEL_GJR_PQ)
+   else
      {
-      g1 = InpGJRGamma; // reaproveita omega/alpha/beta da secao GARCH
+      if(omega < 0.0) { valid=false; reason=StringFormat("Omega negativo (%.6f) invalido p/ GARCH/GJR (so faz sentido em EGARCH)", omega); }
+      else if(aSum + bSum >= 1.0) { valid=false; reason=StringFormat("GARCH/GJR nao-estacionario: alpha+beta=%.4f >= 1", aSum+bSum); }
      }
-
-   double aSum=a1+a2, bSum=b1+b2, gSum=g1+g2;
-   double Eabsz = ExpectedAbsZ();
+   if(!valid)
+     {
+      Comment("GARCH_Vol_Percentile: PARAMETROS INVALIDOS — ", reason,
+              "\nConfira se colou Omega/Alpha/Beta/Gamma da linha certa e selecionou o Modelo correspondente.");
+      Print("GARCH_Vol_Percentile: ", reason);
+      return(false);
+     }
+   Comment(""); // limpa aviso anterior se ficou tudo valido agora
 
    // --- semente: variancia incondicional (evita drift do seed em 10 dias) ---
    double sigma2, lnsigma2 = 0.0;
@@ -313,7 +304,7 @@ bool ComputeForecast(SForecast &out)
       double sigma2_new, lnsigma2_new;
       if(InpModel == MODEL_EGARCH_PQ)
         {
-         lnsigma2_new = omega + bSum*lnsigma2_prev + a1*(MathAbs(z)-Eabsz) + g1*z;
+         lnsigma2_new = omega + bSum*lnsigma2_prev + aSum*(MathAbs(z)-Eabsz) + gSum*z;
          sigma2_new = MathExp(lnsigma2_new);
         }
       else if(InpModel == MODEL_GJR_PQ)
@@ -433,8 +424,7 @@ int ParsePercentiles(double &out[])
 void DrawBands(const SForecast &f)
   {
    ClearObjects();
-   ENUM_LINE_STYLE style = (InpModel==MODEL_EGARCH_PQ) ? InpEgarchStyle :
-                            (InpModel==MODEL_GJR_PQ)    ? InpGJRStyle   : InpGarchStyle;
+   ENUM_LINE_STYLE style = InpLineStyle;
 
    // --- linha base (fechamento de referencia) ---
    DrawLevel("base", f.baseClose, InpBaseColor, STYLE_SOLID,
