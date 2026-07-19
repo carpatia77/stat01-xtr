@@ -173,15 +173,16 @@ def daily_sigma_series_walkforward(ret: pd.Series, min_train: int, refit_every: 
     return sigma1, gregas_por_dia, refit_log
 
 
-def cum_sigma_n(sigma1: float, omega, alpha, beta, gamma) -> float:
+def cum_sigma_n(sigma1: float, omega, alpha, beta, gamma, horizon_days: int) -> float:
     """Forecast multi-dia (choque futuro esperado = 0), mesma lógica do .mq5."""
     sigma2_uncond, _ = _uncond_seed(omega, alpha, beta)
     s2 = sigma1**2
     ln_s2 = np.log(max(s2, 1e-14))
     total = s2
-    for h in range(2, HORIZON_DAYS + 1):
+    for h in range(2, horizon_days + 1):
         if MODEL == "EGARCH":
             ln_s2 = omega + beta*ln_s2
+            ln_s2 = np.clip(ln_s2, -30.0, 3.0)  # mesmo clamp de segurança do _step()
             s2 = np.exp(ln_s2)
         elif MODEL == "GJR":
             s2 = omega + (alpha + 0.5*gamma)*s2 + beta*s2
@@ -192,7 +193,8 @@ def cum_sigma_n(sigma1: float, omega, alpha, beta, gamma) -> float:
 
 
 def backtest(ticker: str, window_start: str | None = None, mode: str = "walkforward",
-             refit_every: int = REFIT_EVERY_DAYS, min_train: int = MIN_TRAIN_DAYS) -> pd.DataFrame:
+             refit_every: int = REFIT_EVERY_DAYS, min_train: int = MIN_TRAIN_DAYS,
+             horizon_days: int = HORIZON_DAYS) -> pd.DataFrame:
     px, ret = get_returns(ticker, scale100=False)
     px = px.sort_index()
     ret = ret.sort_index()
@@ -206,7 +208,7 @@ def backtest(ticker: str, window_start: str | None = None, mode: str = "walkforw
 
     n = len(px)
     rows = []
-    for i in range(n - HORIZON_DAYS - 1):
+    for i in range(n - horizon_days - 1):
         s1 = sigma1[i]
         if np.isnan(s1) or gregas_por_dia[i] is None:
             continue
@@ -215,14 +217,14 @@ def backtest(ticker: str, window_start: str | None = None, mode: str = "walkforw
             continue
         omega, alpha, beta, gamma, nu_ = gregas_por_dia[i]
         base = float(px.iloc[i])
-        realized_price = float(px.iloc[i + HORIZON_DAYS])
-        sN = cum_sigma_n(s1, omega, alpha, beta, gamma)
+        realized_price = float(px.iloc[i + horizon_days])
+        sN = cum_sigma_n(s1, omega, alpha, beta, gamma, horizon_days)
         rows.append((base_date, base, sN, realized_price, nu_))
 
     df = pd.DataFrame(rows, columns=["date", "base", "sigmaN", "realized_price", "nu"])
     janela_txt = f" (desde {window_start})" if window_start else ""
     modo_txt = "GREGAS FIXAS" if mode == "fixo" else f"WALK-FORWARD (refit a cada {refit_every} dias, min_train={min_train})"
-    print(f"\n=== {ticker} — {len(df)} janelas de {HORIZON_DAYS} dias testadas{janela_txt} — modo: {modo_txt} ===")
+    print(f"\n=== {ticker} — {len(df)} janelas de {horizon_days} dias testadas{janela_txt} — modo: {modo_txt} ===")
     if len(df):
         print(f"Período coberto: {df['date'].min().date()} até {df['date'].max().date()}")
 
@@ -277,7 +279,10 @@ if __name__ == "__main__":
     parser.add_argument("--gregas", choices=["fixo", "walkforward"], default="walkforward")
     parser.add_argument("--refit-every", type=int, default=REFIT_EVERY_DAYS)
     parser.add_argument("--min-train", type=int, default=MIN_TRAIN_DAYS)
+    parser.add_argument("--horizon-days", type=int, default=HORIZON_DAYS,
+                        help="N dias à frente da banda 'Condicional' (mesmo InpHorizonDays do .mq5)")
     args = parser.parse_args()
 
     backtest(args.ticker, window_start=args.window_start, mode=args.gregas,
-             refit_every=args.refit_every, min_train=args.min_train)
+             refit_every=args.refit_every, min_train=args.min_train,
+             horizon_days=args.horizon_days)
