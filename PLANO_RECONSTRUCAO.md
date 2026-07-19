@@ -244,4 +244,17 @@ caractere a caractere contra `reports_originais/` (teste de regressão abaixo).
   pega isso porque é sucesso técnico, só emite `ConvergenceWarning`. Sintoma: ΔAIC de
   milhares (2437, -823) num único ativo entre execuções, LB suspeito (=1.000 cravado).
   **Corrigido** em `fit_grid()`: descarta candidato se `res.convergence_flag != 0`,
-  `|mu| > 10×std(retornos)`, `nu` fora de `[2.05, 90]`, ou `|lambda| > 0.995`.
+  `|mu| > 10×std(retornos)`, `nu` fora de `[2.05, 90]` (só p/ `t`/`skewt`), ou
+  `|lambda| > 0.995`. Confirmado no backtest: 6S=F saiu de ΔAIC monstruoso pra
+  -4706.6/-3700.9 (nosso EGARCH(1,1,1) Normal, AIC limpo, vence de verdade o
+  GARCH(2,1) Skewed-t degenerado do report original).
+
+- **Regressão introduzida pelo fix acima (e já corrigida)**: o parâmetro `nu`
+  tem semântica DIFERENTE por distribuição no `arch`. Em `t`/`skewt` é grau de
+  liberdade (deve ser > 2). No **GED, `nu` é o parâmetro de forma/curtose — nu
+  < 2 é resultado LEGÍTIMO** (caudas mais pesadas que a normal, a própria razão
+  de escolher GED). Aplicar o limite `[2.05, 90]` ao GED rejeitava fits válidos
+  em cascata, forçando fallback pra Normal em ~10 ativos (6A, 6C, 6E, 6J, 6L,
+  ES, JPY, NZDUSD, USDBRL, CHF, AUDNZD — todos com ΔAIC positivo/pior e padrão
+  "GED → Normal"), derrubando a taxa de acerto do backtest de 19/34→10/31.
+  **Corrigido**: o teste de `nu` só se aplica quando `dist in ("t", "skewt")`.

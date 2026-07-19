@@ -80,8 +80,17 @@ def fit_grid(ret, alias: str, classe: str) -> dict | None:
                 mu_val = float(res.params.get("mu", 0.0))
                 if ret_scale > 0 and abs(mu_val) > 10 * ret_scale:
                     continue  # média disparada — sinal de otimização perdida
+                # "nu" tem significado DIFERENTE por distribuição no `arch`:
+                # em t/skewt é grau de liberdade (deve ser > 2 p/ variância
+                # finita — nu perto de 2 ou muito alto É degenerado).
+                # No GED, "nu" é o parâmetro de FORMA/curtose — nu < 2 é um
+                # resultado LEGÍTIMO (caudas mais pesadas que a normal, a
+                # própria razão de escolher GED). Aplicar o limite do t/skewt
+                # ao GED rejeitava fits válidos e forçava fallback pra Normal
+                # sistematicamente (confirmado: causava ΔAIC positivo em
+                # ~10 ativos no backtest de 07-14/07-15).
                 nu_val = res.params.get("nu")
-                if nu_val is not None and not (2.05 <= nu_val <= 90):
+                if nu_val is not None and dist in ("t", "skewt") and not (2.05 <= nu_val <= 90):
                     continue  # graus de liberdade grudados no limite do otimizador
                 lam_val = res.params.get("lambda")
                 if lam_val is not None and abs(lam_val) > 0.995:
