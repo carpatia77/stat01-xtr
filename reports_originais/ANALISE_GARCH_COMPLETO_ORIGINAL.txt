@@ -1,0 +1,94 @@
+GARCH ANALYZER COMPLETO – MELHOR MODELO + DISTRIBUIÇÃO AUTOMÁTICA
+Data da análise: 2026-07-17 08:53:27
+Período analisado: 2022-07-18 → 2026-07-17
+Dias corridos: 1460 | Dias úteis: 1044 (≈ 4.14 anos)
+
+RESULTADOS DOS MODELOS VENCEDORES + INTERPRETAÇÃO AUTOMÁTICA
+====================================================================================================================================================================================================================================================================
+Ativo    Modelo               Distribuição     AIC        LB        Ω (Omega)         α (Alpha)       β (Beta)          γ (Gamma)          Status     Interpretação                                               
+====================================================================================================================================================================================================================================================================
+6A       GARCH(1,2)           GED            -7352.8    0.999     0.000000862895     0.05000006      0.92999997        0.00000000        EXCELENTE    CAUDAS EXTREMAS                                             
+6B       GARCH(1,2)           Student-t      -7821.5    0.295     0.000000583905     0.05000002      0.92999998        0.00000000        EXCELENTE    CAUDAS PESADAS (leptocurtose)                               
+6C       GARCH(2,1)           GED            -8488.0    0.617     0.000000283581     0.05000002      0.92999999        0.00000000        EXCELENTE    CAUDAS EXTREMAS                                             
+6E       GARCH(1,2)           Normal         -7946.6    0.682     0.000000466546     0.05000002      0.93000002        0.00000000        EXCELENTE    Estável                                                     
+6J       EGARCH(1,1,1)        GED            -7323.7    0.671    -0.788220476072     0.19302278      0.92117362        0.05623916        EXCELENTE    QUEDAS EXPLODEM VOL! | Choques moderados | TECH/PÂNICO | CAUDAS EXTREMAS
+6L       GARCH(1,2)           GED            -6875.0    0.927     0.000001348293     0.04999999      0.92999985        0.00000000        EXCELENTE    CAUDAS EXTREMAS                                             
+6S       EGARCH(1,1,2)        GED            -4395.5    1.000    -1.196627432698     0.73180946      0.90047319        1.04608610        EXCELENTE    QUEDAS EXPLODEM VOL! | REAÇÃO FORTE A NOTÍCIAS | TECH/PÂNICO | CAUDAS EXTREMAS
+AAPL     EGARCH(1,1,2)        Student-t      -5563.6    0.586    -0.433047094756     0.18992583      0.94602002        -0.14380904       EXCELENTE    Quedas aumentam vol | Choques moderados | TECH/PÂNICO | CAUDAS PESADAS (leptocurtose)
+AMZN     EGARCH(1,1,2)        Student-t      -5028.1    0.296    -0.152512033083     -0.06885329     0.98094151        -0.12567558       EXCELENTE    Leve alavancagem | VOL DURA MUITO (CRISES) | CAUDAS PESADAS (leptocurtose)
+AUDNZD   GARCH(1,1)           GED            -9205.9    0.688     0.000000175600     0.05000000      0.93000000        0.00000000        EXCELENTE    ACAO MADURA | CAUDAS EXTREMAS                               
+USDBRL   GARCH(1,2)           GED            -7071.0    0.987     0.000001401520     0.05000001      0.92999997        0.00000000        EXCELENTE    FOREX CLÁSSICO | CAUDAS EXTREMAS                            
+BTC-USD  EGARCH(1,1,2)        GED            -6951.3    0.444    -1.057957815173     0.30146200      0.85443789        -0.08074450       EXCELENTE    QUEDAS EXPLODEM VOL! | REAÇÃO FORTE A NOTÍCIAS | TECH/PÂNICO | CAUDAS EXTREMAS
+CHF      EGARCH(1,1,1)        Normal         -8066.1    0.249    -1.466310973096     0.22518059      0.86135573        -0.08272199       EXCELENTE    QUEDAS EXPLODEM VOL! | REAÇÃO FORTE A NOTÍCIAS | TECH/PÂNICO
+CL       GARCH(1,1)           Skewed t       -4805.1    0.402     0.000009704331     0.06646595      0.91701528        0.00000000        EXCELENTE    CAUDAS PESADAS + ASSIMETRIA                                 
+DIA      EGARCH(1,1,2)        Normal         -6789.7    0.070    -0.267319832365     0.10210414      0.97182346        -0.14122472       EXCELENTE    Quedas aumentam vol | Vol persistente | Choques moderados   
+DX-Y.NYB GARCH(1,1)           Student-t      -8103.9    0.609     0.000000181584     0.04273062      0.94828720        0.00000000        EXCELENTE    ACAO MADURA | CAUDAS PESADAS (leptocurtose)                 
+EURUSD   GARCH(1,2)           GED            -8276.0    0.930     0.000000453139     0.05000000      0.92999998        0.00000000        EXCELENTE    FOREX CLÁSSICO | CAUDAS EXTREMAS                            
+EWZ      GARCH(2,1)           Student-t      -5434.2    0.597     0.000002349218     0.01673037      0.97371152        0.00000000        EXCELENTE    Vol persistente | ACAO MADURA | CAUDAS PESADAS (leptocurtose)
+GC       EGARCH(1,1,1)        Skewed t       -6271.6    0.460    -0.179455241353     0.15957140      0.97906204        0.04329373        EXCELENTE    Leve alavancagem | Vol persistente | Choques moderados | CAUDAS PESADAS + ASSIMETRIA
+GOOGL    EGARCH(1,1,2)        Student-t      -5153.3    0.988    -0.221654723843     0.07176527      0.97128832        -0.06531102       EXCELENTE    Quedas aumentam vol | Vol persistente | CAUDAS PESADAS (leptocurtose)
+JPY      EGARCH(1,1,1)        GED            -7708.2    0.855    -0.896485537054     0.24827416      0.91074310        -0.03978233       EXCELENTE    QUEDAS EXPLODEM VOL! | REAÇÃO FORTE A NOTÍCIAS | TECH/PÂNICO | CAUDAS EXTREMAS
+RTY      EGARCH(1,1,2)        Student-t      -5831.5    0.063    -0.508644483356     0.10998306      0.94080718        -0.09193005       EXCELENTE    QUEDAS EXPLODEM VOL! | Choques moderados | TECH/PÂNICO | CAUDAS PESADAS (leptocurtose)
+ES       EGARCH(1,1,2)        GED            -6658.8    0.898    -0.472785310838     0.10895407      0.95007551        -0.23441436       EXCELENTE    Quedas aumentam vol | Vol persistente | Choques moderados | TECH/PÂNICO | CAUDAS EXTREMAS
+MGC      EGARCH(1,1,1)        Skewed t       -6273.0    0.490    -0.183252362823     0.15915885      0.97866773        0.04420210        EXCELENTE    Leve alavancagem | Vol persistente | Choques moderados | CAUDAS PESADAS + ASSIMETRIA
+NQ       EGARCH(1,1,2)        Skewed t       -5988.3    0.835    -0.479186033246     0.18704302      0.94457046        -0.18143220       EXCELENTE    Quedas aumentam vol | Choques moderados | TECH/PÂNICO | CAUDAS PESADAS + ASSIMETRIA
+YM       EGARCH(1,1,2)        Normal         -6769.8    0.055    -0.302215786217     0.11873576      0.96801247        -0.15175544       EXCELENTE    Quedas aumentam vol | Vol persistente | Choques moderados | TECH/PÂNICO
+NVDA     EGARCH(1,1,1)        Student-t      -4269.1    1.000    -0.175886713785     0.11163406      0.97443231        -0.04555005       EXCELENTE    Leve alavancagem | Vol persistente | Choques moderados | CAUDAS PESADAS (leptocurtose)
+NZDUSD   GARCH(1,2)           Student-t      -7567.9    0.991     0.000000982598     0.06045110      0.91510587        0.00000000        EXCELENTE    ACAO MADURA | CAUDAS PESADAS (leptocurtose)                 
+TSLA     GARCH(1,1)           Student-t      -3880.8    0.179     0.000024287888     0.03050933      0.95156460        0.00000000        EXCELENTE    Vol persistente | ACAO MADURA | CAUDAS PESADAS (leptocurtose)
+USDX     GARCH(1,1)           GED            -6633.1    0.092     0.000000121541     0.20000000      0.70000000        0.00000000        EXCELENTE    Choques moderados | ACAO VOLÁTIL | CAUDAS EXTREMAS          
+XAF      EGARCH(1,1,1)        Skewed t       -6368.7    0.062    -0.377855223070     0.09001764      0.95832652        -0.10737595       EXCELENTE    Quedas aumentam vol | Vol persistente | TECH/PÂNICO | CAUDAS PESADAS + ASSIMETRIA
+^BVSP    GARCH(1,2)           Student-t      -6304.2    0.680     0.000002265431     0.05000000      0.92999991        0.00000000        EXCELENTE    CAUDAS PESADAS (leptocurtose)                               
+^VIX     EGARCH(1,1,1)        Skewed t       -2785.3    0.992    -0.490186144510     0.13326953      0.90661917        0.29486509        EXCELENTE    Quedas aumentam vol | Choques moderados | TECH/PÂNICO | CAUDAS PESADAS + ASSIMETRIA
+^VVIX    EGARCH(1,1,1)        Skewed t       -3276.2    0.986    -0.225791124299     0.01740131      0.95994572        0.29797273        EXCELENTE    Quedas aumentam vol | Vol persistente | CAUDAS PESADAS + ASSIMETRIA
+====================================================================================================================================================================================================================================================================
+
+NOVO: DISTRIBUIÇÕES TESTADAS AUTOMATICAMENTE
+• Normal     → Padrão, mas raramente melhor em finanças
+• Student-t  → Captura caudas pesadas → quase sempre melhora o AIC
+• Skewed t   → + assimetria nos retornos → ótima para ações/tech
+• GED        → Flexível para caudas muito pesadas
+
+CRITÉRIOS DE SELEÇÃO DO MELHOR MODELO + DISTRIBUIÇÃO
+• Primeiro: Ljung-Box p > 0.05 (resíduos sem estrutura)
+• Depois: Menor AIC entre os válidos
+
+INTERPRETAÇÃO DOS PARÂMETROS GREGOS
+====================================================================================================================================================================================================================================================================
+Ω (Omega)   → Volatilidade de longo prazo
+            • GARCH/GJR: sempre positivo
+            • EGARCH: pode ser NEGATIVO → quedas aumentam vol mais que subidas
+            • Ex: Ω = -0.645 → quedas geram PÂNICO de vol
+
+α (Alpha)   → Impacto total de choques recentes (soma de todos os α[i])
+            • α alto → volatilidade reage forte a eventos
+            • Ex: α = 0.341 → 34.1% do choque entra na vol
+
+β (Beta)    → Persistência total da volatilidade (soma de todos os β[i])
+            • β próximo de 1 → vol dura MUITO tempo
+            • Ex: β = 0.991 → vol dura ~30 dias
+            • α + β ≈ 0.98 → vol de hoje explica 98% da vol amanhã
+
+γ (Gamma)   → Assimetria (efeito alavancagem)
+            • Presente em: EGARCH e GJR-GARCH
+            • γ > 0 → más notícias aumentam vol mais que boas
+            • γ = 0 → sem assimetria (GARCH)
+            • Se γ ≠ 0 → use EGARCH ou GJR no EA!
+
+DICAS PARA MT5:
+• EGARCH: use log(vol) → exp() no MQL5
+• GJR: use (retorno < 0) ? (alpha + gamma) : alpha
+• Para GARCH(p,q): some todos os α[i] e β[i]
+• Atualize todo dia com novos dados
+====================================================================================================================================================================================================================================================================
+
+LEGENDA DAS INTERPRETAÇÕES AUTOMÁTICAS (v3.9.4)
+====================================================================================================================================================================================================================================================================
+FOREX CLÁSSICO     → FOREX + GARCH + α<0.07 + β>0.90
+VOL TÉCNICA        → FUTUROS + GARCH + α>0.08
+ACAO MADURA        → AÇÃO + GARCH + α<0.07
+ACAO VOLÁTIL       → AÇÃO + GARCH + α>0.15
+QUEDAS EXPLODEM VOL! → EGARCH + Ω < -0.5
+VOL DURA MUITO     → β > 0.98
+TECH/PÂNICO        → EGARCH + Ω < -0.3
+====================================================================================================================================================================================================================================================================
