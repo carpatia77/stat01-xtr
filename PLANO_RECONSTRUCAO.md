@@ -11,6 +11,40 @@ com os reports de referência (armazenados em `reports_originais/`).
 
 ---
 
+## 0. STATUS DA RECONSTRUÇÃO (validado contra os originais)
+
+Reconstrução **concluída e validada** com `arch 6.3` / `statsmodels 0.14.2` /
+Python 3.12. Cadeia de causas depuradas durante a validação:
+
+| # | Descoberta | Correção |
+|---|---|---|
+| 1 | `END_DATE = date.today()` quebrava reprodução | fixado em 2026-07-17 |
+| 2 | `end + timedelta(1)` incluía 17/07 (yfinance `end` é exclusivo → série para em 16/07) | removido |
+| 3 | Report 2 sem termo de assimetria (`o=0`) → forecast errava ~8% | `o=1` |
+| 4 | Distribuição do Report 2 | `t` (10/19 vs 8/19 do skewt) |
+| 5 | Ljung-Box: hipótese lag=10/nível estava errada | **lag=20 sobre resíduos²** (GC crava p=0.460) |
+| 6 | `auto_adjust` | `False` (Close bruto) |
+
+**Provas de fidelidade** (mesmo ambiente atual, sem o snapshot do autor):
+- Report 1 / GC: modelo (EGARCH(1,1,1) Skewed t), AIC (-6271.6), LB (0.460) e
+  ω/α/β/γ batem até a 5ª casa. Idem ^VIX, ^VVIX, ES, MGC, NQ, NVDA.
+- Report 2: σ e bandas cravam nos ativos com histórico intacto.
+
+**Limites irredutíveis (não são bug de código):**
+- **Revisão retroativa do Yahoo** em 5 pares de moeda/índice (BRL=X, EURBRL=X,
+  USDBRL=X, NZDUSD=X, ^VIX) → dados de entrada mudaram; irreprodutível sem o
+  snapshot congelado do autor.
+- **Micro-drift do otimizador**: em perfis de verossimilhança planos, a 5ª casa
+  dos parâmetros varia entre versões da lib; em poucos ativos (RTY, EWZ, TSLA)
+  isso faz a seleção pousar num modelo adjacente (ex.: GJR-GARCH vs GARCH) por
+  diferença milimétrica de AIC.
+
+**Pendências abertas (não bloqueiam o núcleo):**
+- **USDX** e **XAF**: tickers Yahoo não identificados (`None` no config). `DX=F`
+  dá 404. Calibrar pelo AIC de referência (USDX -6633.1; XAF -6368.7).
+
+---
+
 ## 1. Conclusões da engenharia reversa (evidências)
 
 ### 1.1 Stack e fonte de dados
@@ -63,9 +97,13 @@ Notação exibida: EGARCH mostra os 3 índices `(p,o,q)`; GARCH mostra `(p,q)`.
 
 ### 1.5 Report 1 — critério de seleção
 Conforme o próprio report declara:
-1. Filtrar modelos com **Ljung-Box p > 0.05** (resíduos padronizados sem autocorrelação;
-   usar `statsmodels.stats.diagnostic.acorr_ljungbox` sobre `res.std_resid`, lag=10,
-   reportando o p-value — coluna `LB`).
+1. Filtrar modelos com **Ljung-Box p > 0.05**. Config **calibrada e confirmada**
+   contra o original (GC crava p=0.460):
+   `acorr_ljungbox(res.std_resid.dropna()**2, lags=[20])["lb_pvalue"]` — ou seja,
+   **lag=20**, sobre os **resíduos padronizados AO QUADRADO** (testa efeito ARCH
+   remanescente na variância, não autocorrelação na média), **sem `model_df`**.
+   Nota: as hipóteses iniciais (lag=10, resíduos de nível) estavam ERRADAS — só
+   `lag=20 + quadrado` reproduz o p-valor do report.
 2. Entre os válidos, escolher o **menor AIC** (`res.aic`).
 3. `Status = "EXCELENTE"` quando LB > 0.05 (todos os vencedores exibem isso; prever
    possíveis níveis inferiores, ex. "BOM"/"RUIM", para LB menor — calibrar se surgir).

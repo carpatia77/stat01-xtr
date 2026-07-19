@@ -25,7 +25,10 @@ GRID = (
 )
 DISTS = ["normal", "t", "skewt", "ged"]
 
-LB_LAG = 10  # calibrar contra reports_originais se necessário
+# Ljung-Box calibrado contra o original (GC crava p=0.460): lag=20 sobre os
+# RESÍDUOS PADRONIZADOS AO QUADRADO (testa efeito ARCH remanescente na
+# variância, não autocorrelação na média), sem ajuste de model_df.
+LB_LAG = 20
 
 
 def _model_label(vol: str, p: int, o: int, q: int) -> str:
@@ -70,7 +73,8 @@ def fit_grid(ret, alias: str, classe: str) -> dict | None:
                 )
                 res = am.fit(disp="off", show_warning=False)
                 lb_pval = float(
-                    acorr_ljungbox(res.std_resid, lags=[LB_LAG])["lb_pvalue"].iloc[0]
+                    acorr_ljungbox(res.std_resid.dropna() ** 2,
+                                   lags=[LB_LAG])["lb_pvalue"].iloc[0]
                 )
                 candidatos.append({
                     "lb": lb_pval,
