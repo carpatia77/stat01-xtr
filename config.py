@@ -51,11 +51,7 @@ ASSETS_R1 = [
     ("NVDA",     "NVDA",      "AÇÃO"),
     ("NZDUSD",   "NZDUSD=X",  "AÇÃO"),   # mapeado como AÇÃO no original
     ("TSLA",     "TSLA",      "AÇÃO"),
-    ("USDX",     None,        "AÇÃO"),    # TODO: ticker não identificado. DX=F dá 404 (delisted no Yahoo);
-                                          # DX-Y.NYB já é do alias "DX-Y.NYB" e tem AIC diferente.
-                                          # Referência: GARCH(1,1) GED, AIC=-6633.1 (α/β travados em 0.20/0.70)
-    ("XAF",      None,        "FUTUROS"), # TODO: ticker não identificado.
-                                          # Referência: EGARCH(1,1,1) Skewed t, AIC=-6368.7
+
     ("^BVSP",    "^BVSP",     "AÇÃO"),
     ("^VIX",     "^VIX",      "AÇÃO"),
     ("^VVIX",    "^VVIX",     "AÇÃO"),

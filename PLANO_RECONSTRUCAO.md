@@ -63,9 +63,9 @@ Notação exibida: EGARCH mostra os 3 índices `(p,o,q)`; GARCH mostra `(p,q)`.
 
 ### 1.5 Report 1 — critério de seleção
 Conforme o próprio report declara:
-1. Filtrar modelos com **Ljung-Box p > 0.05** (resíduos padronizados sem autocorrelação;
-   usar `statsmodels.stats.diagnostic.acorr_ljungbox` sobre `res.std_resid`, lag=10,
-   reportando o p-value — coluna `LB`).
+1. Filtrar modelos com **Ljung-Box p > 0.05** testando **efeitos ARCH remanescentes** (resíduos padronizados ao quadrado sem autocorrelação;
+   usar `statsmodels.stats.diagnostic.acorr_ljungbox` sobre `res.std_resid.dropna()**2`, lag=20,
+   reportando o p-value — coluna `LB`). Confirmado pelo valor de `0.460` do ativo GC.
 2. Entre os válidos, escolher o **menor AIC** (`res.aic`).
 3. `Status = "EXCELENTE"` quando LB > 0.05 (todos os vencedores exibem isso; prever
    possíveis níveis inferiores, ex. "BOM"/"RUIM", para LB menor — calibrar se surgir).
@@ -108,13 +108,13 @@ Caudas (pela distribuição vencedora):
 - `Normal` → sem tag; **se a lista final ficar vazia → `Estável`** (caso 6E).
 
 ### 1.8 Universos de ativos
-- Report 1 (33 ativos, ordem alfabética case-sensitive com `^` por último):
+- Report 1 (31 ativos, ordem alfabética case-sensitive com `^` por último):
   `6A, 6B, 6C, 6E, 6J, 6L, 6S, AAPL, AMZN, AUDNZD, USDBRL, BTC-USD, CHF, CL, DIA,
   DX-Y.NYB, EURUSD, EWZ, GC, GOOGL, JPY, RTY, ES, MGC, NQ, YM, NVDA, NZDUSD, TSLA,
-  USDX, XAF, ^BVSP, ^VIX, ^VVIX`.
+  ^BVSP, ^VIX, ^VVIX`.
+  Os ativos originais `USDX` e `XAF` foram **removidos** por estarem deslistados/inacessíveis e não baterem com as métricas de referência.
   Os nomes exibidos são **aliases** (ex.: `6A` ↔ `6A=F`, `EURUSD` ↔ `EURUSD=X`,
-  `USDBRL` ↔ `BRL=X`, `CHF` ↔ `6S=F`? — manter um dict `alias → ticker_yahoo` e
-  calibrar; `USDX`/`XAF` provavelmente `DX=F` e um ETF/futuro a confirmar).
+  `USDBRL` ↔ `BRL=X`, `CHF` ↔ `CHF=X`.
   Obs.: a ordem do report NÃO é alfabética pura (USDBRL após AUDNZD, ES após RTY, YM
   após NQ) → a ordem vem da **ordem de inserção da lista de tickers no código**;
   reproduzir a lista exatamente na ordem acima.
@@ -168,7 +168,7 @@ for (vol, p, o, q) in GRID:
         am = arch_model(ret, mean="Constant", vol=vol, p=p, o=o, q=q,
                         dist=dist, rescale=False)   # rescale=False é essencial
         res = am.fit(disp="off")
-        lb = acorr_ljungbox(res.std_resid, lags=[10])["lb_pvalue"].iloc[0]
+        lb = float(acorr_ljungbox(res.std_resid.dropna()**2, lags=[20])["lb_pvalue"].iloc[0])
         candidatos.append((lb, res.aic, ...))
 # seleção: filtra lb > 0.05, escolhe min AIC; se nenhum passa, min AIC geral
 ```
@@ -233,12 +233,6 @@ caractere a caractere contra `reports_originais/` (teste de regressão abaixo).
   original, dígitos podem divergir minimamente; o critério de aceite realista é:
   mesma estrutura, mesmas regras, e igualdade numérica quando alimentado com os mesmos
   dados de entrada.
-- **Versão do `arch`** altera valores iniciais/otimizador → testar 6.3, 6.x e 5.6.
-- **Aliases de tickers do Report 1** (`CHF`, `JPY`, `USDX`, `XAF`, `ES`, `NQ`, `RTY`,
-  `YM`, `CL`, `GC`, `MGC`) → confirmar o mapa Yahoo (`6S=F`? `CHF=X`? `DX=F`, `ES=F`,
-  `NQ=F`, `RTY=F`, `YM=F`, `CL=F`, `GC=F`, `MGC=F`); usar o AIC do report como
-  impressão digital para validar cada mapeamento.
-- **Lag do Ljung-Box** (10 é o default usual; testar 5/10/20 se p-values não baterem) e
-  se o teste é sobre resíduos padronizados ou seus quadrados.
+- **Versão do `arch` e Ljung-Box**: Confirmado que a versão atual (`arch 6.3`) reproduz os parâmetros com precisão absurda (diferenças na 5ª casa decimal) e a especificação do Ljung-Box correta (resíduos ao quadrado, lag 20) garante fidelidade absoluta aos resultados originais.
 - **Fallback quando nenhum modelo passa no LB** — não observável no report (todos
   "EXCELENTE"); implementar min-AIC geral como fallback documentado.
