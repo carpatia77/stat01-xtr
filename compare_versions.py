@@ -56,17 +56,23 @@ def compare_r1(original: dict, computed: dict) -> pd.DataFrame:
     all_assets = set(original.keys()) | set(computed.keys())
     for asset in sorted(all_assets):
         if asset not in original or asset not in computed:
-            rows.append({'Ativo': asset, 'Status': '🔴 FALTANDO NO OUTRO'})
+            rows.append({'Ativo': asset, 'Status': 'FALTANDO NO OUTRO', 'Mudou Modelo': '-', 'Mudou Dist': '-', 'dAIC': '-'})
             continue
         orig, comp = original[asset], computed[asset]
         row = {'Ativo': asset}
         model_match = orig['model'] == comp['model']
         dist_match = orig['distribution'] == comp['distribution']
-        aic_err = abs(comp['aic'] - orig['aic']) / abs(orig['aic']) if orig['aic'] != 0 else 0
+        aic_diff = comp['aic'] - orig['aic']
+        aic_err = abs(aic_diff) / abs(orig['aic']) if orig['aic'] != 0 else 0
         lb_match = (orig['lb'] > 0.05) == (comp['lb'] > 0.05)
         
         all_ok = all([model_match, dist_match, aic_err < tolerances['aic'], lb_match])
-        row['Status'] = '🟢 PASSOU' if all_ok else '🔴 FALHOU'
+        row['Status'] = 'PASSOU' if all_ok else 'FALHOU'
+        row['Mudou Modelo'] = 'NAO' if model_match else f"{orig['model']} -> {comp['model']}"
+        row['Mudou Dist'] = 'NAO' if dist_match else f"{orig['distribution']} -> {comp['distribution']}"
+        row['dAIC'] = round(aic_diff, 2)
+        row['Orig_LB'] = orig['lb']
+        row['Comp_LB'] = comp['lb']
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -75,7 +81,7 @@ def compare_r2(original: dict, computed: dict) -> pd.DataFrame:
     all_assets = set(original.keys()) | set(computed.keys())
     for asset in sorted(all_assets):
         if asset not in original or asset not in computed:
-            rows.append({'Ativo': asset, 'Status': '🔴 FALTANDO NO OUTRO'})
+            rows.append({'Ativo': asset, 'Status': 'FALTANDO NO OUTRO'})
             continue
         orig, comp = original[asset], computed[asset]
         row = {'Ativo': asset}
@@ -85,7 +91,9 @@ def compare_r2(original: dict, computed: dict) -> pd.DataFrame:
         
         # Tolerância apertada para predição
         all_ok = (vol_err < 0.05) and (min_err < 0.05) and (max_err < 0.05)
-        row['Status'] = '🟢 PASSOU' if all_ok else '🔴 FALHOU'
+        row['Status'] = 'PASSOU' if all_ok else 'FALHOU'
+        row['Orig_Vol'] = orig['vol_pct']
+        row['Comp_Vol'] = comp['vol_pct']
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -117,12 +125,14 @@ def main():
         comp_r1 = Path(f"ANALISE_GARCH_COMPLETO_{dt}.txt")
         if orig_r1.exists() and comp_r1.exists():
             df1 = compare_r1(parse_garch_report(str(orig_r1)), parse_garch_report(str(comp_r1)))
-            pass_r1 = (df1['Status'] == '🟢 PASSOU').sum()
-            fail_r1 = (df1['Status'] == '🔴 FALHOU').sum()
+            pass_r1 = (df1['Status'] == 'PASSOU').sum()
+            fail_r1 = (df1['Status'] == 'FALHOU').sum()
+            missing_r1 = (df1['Status'] == 'FALTANDO NO OUTRO').sum()
             print(f"\n[REPORT 1 - {dt}]")
-            print(f"Total: {len(df1)} | ✓ Passaram: {pass_r1} | ✗ Falharam: {fail_r1}")
+            print(f"Total na interseção: {len(df1) - missing_r1} | Passaram: {pass_r1} | Falharam: {fail_r1} | Missing (Drop/Adic): {missing_r1}")
             if fail_r1 > 0:
-                print("Falhas em R1:", df1[df1['Status'] == '🔴 FALHOU']['Ativo'].tolist())
+                print("\nDETALHES DAS FALHAS (R1):")
+                print(df1[df1['Status'] == 'FALHOU'].to_markdown(index=False))
         
         # Comparar R2
         # Tentar achar o arquivo R2 original que tem "_082239" no final, por exemplo: EGARCH-TSTUDENT(1.1)-t_2026-07-14_082239.txt
@@ -131,12 +141,14 @@ def main():
         if orig_r2_matches and comp_r2.exists():
             orig_r2 = orig_r2_matches[0]
             df2 = compare_r2(parse_forecast_report(orig_r2), parse_forecast_report(str(comp_r2)))
-            pass_r2 = (df2['Status'] == '🟢 PASSOU').sum()
-            fail_r2 = (df2['Status'] == '🔴 FALHOU').sum()
+            pass_r2 = (df2['Status'] == 'PASSOU').sum()
+            fail_r2 = (df2['Status'] == 'FALHOU').sum()
+            missing_r2 = (df2['Status'] == 'FALTANDO NO OUTRO').sum()
             print(f"\n[REPORT 2 - {dt}]")
-            print(f"Total: {len(df2)} | ✓ Passaram: {pass_r2} | ✗ Falharam: {fail_r2}")
+            print(f"Total na interseção: {len(df2) - missing_r2} | Passaram: {pass_r2} | Falharam: {fail_r2} | Missing (Drop/Adic): {missing_r2}")
             if fail_r2 > 0:
-                print("Falhas em R2:", df2[df2['Status'] == '🔴 FALHOU']['Ativo'].tolist())
+                print("\nDETALHES DAS FALHAS (R2):")
+                print(df2[df2['Status'] == 'FALHOU'].to_markdown(index=False))
 
 if __name__ == "__main__":
     main()
