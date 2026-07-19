@@ -59,6 +59,7 @@ def fit_grid(ret, alias: str, classe: str) -> dict | None:
     devolve dict pronto para render_report1.
     """
     candidatos = []
+    ret_scale = float(ret.std())
 
     for (vol, p, o, q) in GRID:
         for dist in DISTS:
@@ -69,6 +70,23 @@ def fit_grid(ret, alias: str, classe: str) -> dict | None:
                     rescale=False,  # ESSENCIAL: manter retornos sem reescala
                 )
                 res = am.fit(disp="off", show_warning=False)
+
+                # --- guarda de sanidade: rejeita fits "tecnicamente bem
+                # sucedidos" mas numericamente degenerados (o optimizer não
+                # levanta exceção quando pousa num limite/mínimo ruim, só
+                # emite warning — que o except abaixo nunca pegaria).
+                if getattr(res, "convergence_flag", 0) != 0:
+                    continue  # scipy reportou não-convergência real
+                mu_val = float(res.params.get("mu", 0.0))
+                if ret_scale > 0 and abs(mu_val) > 10 * ret_scale:
+                    continue  # média disparada — sinal de otimização perdida
+                nu_val = res.params.get("nu")
+                if nu_val is not None and not (2.05 <= nu_val <= 90):
+                    continue  # graus de liberdade grudados no limite do otimizador
+                lam_val = res.params.get("lambda")
+                if lam_val is not None and abs(lam_val) > 0.995:
+                    continue  # assimetria da Skewed-t grudada no limite ±1
+
                 lb_pval = float(
                     acorr_ljungbox(res.std_resid.dropna()**2, lags=[LB_LAG])["lb_pvalue"].iloc[0]
                 )

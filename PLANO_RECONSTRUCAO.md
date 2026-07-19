@@ -236,3 +236,12 @@ caractere a caractere contra `reports_originais/` (teste de regressão abaixo).
 - **Versão do `arch` e Ljung-Box**: Confirmado que a versão atual (`arch 6.3`) reproduz os parâmetros com precisão absurda (diferenças na 5ª casa decimal) e a especificação do Ljung-Box correta (resíduos ao quadrado, lag 20) garante fidelidade absoluta aos resultados originais.
 - **Fallback quando nenhum modelo passa no LB** — não observável no report (todos
   "EXCELENTE"); implementar min-AIC geral como fallback documentado.
+- **Fits degenerados aceitos silenciosamente (encontrado no backtest de 2026-07-14/15,
+  ativo `6S=F`)**: `res.fit()` pode "convergir" tecnicamente (não lança exceção) mas
+  pousar num ótimo sem sentido — ex.: Skewed-t com `mu≈122539` (5 ordens de grandeza
+  acima da escala dos retornos, ~1e-4) e `lambda≈-0.9999` (grudado no limite de
+  assimetria), gerando AIC=+69434 em vez de ~-7040. O `except Exception` do grid nunca
+  pega isso porque é sucesso técnico, só emite `ConvergenceWarning`. Sintoma: ΔAIC de
+  milhares (2437, -823) num único ativo entre execuções, LB suspeito (=1.000 cravado).
+  **Corrigido** em `fit_grid()`: descarta candidato se `res.convergence_flag != 0`,
+  `|mu| > 10×std(retornos)`, `nu` fora de `[2.05, 90]`, ou `|lambda| > 0.995`.
