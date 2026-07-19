@@ -89,6 +89,10 @@ input string          InpPercentiles  = "5,25,50,75,95";
 input int             InpHorizonDays  = 5;     // N dias a frente (banda "Condicional N-Dias")
 input double          InpConfidenceBand = 0.95; // IC externo (ex.: 0.95 -> ±1.96 sigma)
 
+input color InpBaseColor  = clrYellow;  // linha base (fechamento de referencia)
+input color InpUpperColor = clrLime;    // banda de confianca + pares de percentil, lado de cima
+input color InpLowerColor = clrWhite;   // banda de confianca + pares de percentil, lado de baixo
+
 //======================================================================
 // === 4. Recursao Condicional ===
 //======================================================================
@@ -460,6 +464,39 @@ int OnInit()
 
    for(int i=0; i<=10; i++)
       PlotIndexSetDouble(i, PLOT_EMPTY_VALUE, EMPTY_VALUE);
+
+   // --- cores/estilos: sem isso as 11 linhas saem todas parecidas (default
+   // do MT5), impossível distinguir "qual banda é qual" só olhando o
+   // gráfico. Usa InpBaseColor/InpUpperColor/InpLowerColor (já existiam
+   // como input mas nunca estavam conectados a nada) + estilo/espessura
+   // crescente conforme a distância do centro, pra diferenciar os pares
+   // de percentil mesmo compartilhando a mesma cor.
+   PlotIndexSetInteger(0, PLOT_LINE_COLOR, InpBaseColor);
+   PlotIndexSetInteger(0, PLOT_LINE_WIDTH, 2);
+   PlotIndexSetInteger(0, PLOT_LINE_STYLE, STYLE_SOLID);
+
+   PlotIndexSetInteger(1, PLOT_LINE_COLOR, InpUpperColor);   // conf+ (banda externa, mais grossa)
+   PlotIndexSetInteger(1, PLOT_LINE_WIDTH, 2);
+   PlotIndexSetInteger(1, PLOT_LINE_STYLE, STYLE_SOLID);
+   PlotIndexSetInteger(2, PLOT_LINE_COLOR, InpLowerColor);   // conf-
+   PlotIndexSetInteger(2, PLOT_LINE_WIDTH, 2);
+   PlotIndexSetInteger(2, PLOT_LINE_STYLE, STYLE_SOLID);
+
+   // pares de percentil: rank 1 = mais perto do centro (pontilhado, fino),
+   // rank crescente = mais longe (traços maiores). Nunca usa STYLE_SOLID
+   // pra não confundir com a banda de confiança (índices 1/2).
+   int pctlStyles[N_PCTL_PAIRS] = { STYLE_DOT, STYLE_DASH, STYLE_DASHDOT, STYLE_DASHDOTDOT };
+   int upIdx[N_PCTL_PAIRS] = {3,5,7,9};
+   int dnIdx[N_PCTL_PAIRS] = {4,6,8,10};
+   for(int k=0; k<N_PCTL_PAIRS; k++)
+     {
+      PlotIndexSetInteger(upIdx[k], PLOT_LINE_COLOR, InpUpperColor);
+      PlotIndexSetInteger(upIdx[k], PLOT_LINE_STYLE, pctlStyles[k]);
+      PlotIndexSetInteger(upIdx[k], PLOT_LINE_WIDTH, 1);
+      PlotIndexSetInteger(dnIdx[k], PLOT_LINE_COLOR, InpLowerColor);
+      PlotIndexSetInteger(dnIdx[k], PLOT_LINE_STYLE, pctlStyles[k]);
+      PlotIndexSetInteger(dnIdx[k], PLOT_LINE_WIDTH, 1);
+     }
 
    ArraySetAsSeries(BufBase, false);
    ArraySetAsSeries(BufConfUp, false);
