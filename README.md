@@ -14,6 +14,9 @@ Através da dissecação de horas de pregão gravado, isolamos dois *Paretos* (P
 * **A Ignição**: O preço rompe e se sustenta acima da Linha Azul (Ajuste). Simultaneamente, o fluxo Micro (curto prazo) ganha tração junto com a agressão do Maker (Smart Money). 
 * **A Absorção (Exaustão Institucional)**: Os velocímetros de fluxo apontam exaustão compradora máxima, mas o preço resulta em um pavio (wick) sem romper a resistência. O lote institucional passivo absorveu toda a agressão do varejo, antecedendo um desabamento.
 
+> 📝 **Nota de Auditoria (Pregão de 03/07/2026):**  
+> Os estudos visuais homologados neste projeto foram extraídos da gravação do pregão do dia **03/07/2026**.  
+> **Aviso Crítico sobre Dados Quantitativos:** Na etapa de cruzamento de dados (Backtest Quantitativo), constatamos que a fonte primária (Yahoo Finance) reportou dados nulos (`NaN`) para o ativo Ouro (XAUUSD) durante a sessão intradiária deste dia específico. O motivo isolado foi o feriado bancário/bolsa nos Estados Unidos (Independence Day observado no dia 3 de julho, já que dia 4 caiu no fim de semana). Por este motivo, o Backtest Matemático do GARCH excluiu este dia, reforçando a superioridade e a necessidade da camada Visual (o Veredito de Visão) capturando a dinâmica real da corretora no momento em que a anomalia ocorreu, independentemente de falhas em APIs de dados de terceiros.
 ## ⚙️ 3. Arquitetura Tecnológica do Agente Híbrido
 Não enviamos os cálculos para dentro da infraestrutura pesada do MetaTrader/MQL5. Construímos um pipeline assíncrono e resiliente em Python:
 1. **Captura HFT**: Utiliza a biblioteca mss e pygetwindow para focar exclusivamente na janela de transmissão (Zoom) do painel ASG, extraindo frames em milissegundos direto para a memória RAM.
