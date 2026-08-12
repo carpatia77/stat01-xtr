@@ -63,9 +63,9 @@ Notação exibida: EGARCH mostra os 3 índices `(p,o,q)`; GARCH mostra `(p,q)`.
 
 ### 1.5 Report 1 — critério de seleção
 Conforme o próprio report declara:
-1. Filtrar modelos com **Ljung-Box p > 0.05** (resíduos padronizados sem autocorrelação;
-   usar `statsmodels.stats.diagnostic.acorr_ljungbox` sobre `res.std_resid`, lag=10,
-   reportando o p-value — coluna `LB`).
+1. Filtrar modelos com **Ljung-Box p > 0.05** testando **efeitos ARCH remanescentes** (resíduos padronizados ao quadrado sem autocorrelação;
+   usar `statsmodels.stats.diagnostic.acorr_ljungbox` sobre `res.std_resid.dropna()**2`, lag=20,
+   reportando o p-value — coluna `LB`). Confirmado pelo valor de `0.460` do ativo GC.
 2. Entre os válidos, escolher o **menor AIC** (`res.aic`).
 3. `Status = "EXCELENTE"` quando LB > 0.05 (todos os vencedores exibem isso; prever
    possíveis níveis inferiores, ex. "BOM"/"RUIM", para LB menor — calibrar se surgir).
@@ -108,13 +108,13 @@ Caudas (pela distribuição vencedora):
 - `Normal` → sem tag; **se a lista final ficar vazia → `Estável`** (caso 6E).
 
 ### 1.8 Universos de ativos
-- Report 1 (33 ativos, ordem alfabética case-sensitive com `^` por último):
+- Report 1 (31 ativos, ordem alfabética case-sensitive com `^` por último):
   `6A, 6B, 6C, 6E, 6J, 6L, 6S, AAPL, AMZN, AUDNZD, USDBRL, BTC-USD, CHF, CL, DIA,
   DX-Y.NYB, EURUSD, EWZ, GC, GOOGL, JPY, RTY, ES, MGC, NQ, YM, NVDA, NZDUSD, TSLA,
-  USDX, XAF, ^BVSP, ^VIX, ^VVIX`.
+  ^BVSP, ^VIX, ^VVIX`.
+  Os ativos originais `USDX` e `XAF` foram **removidos** por estarem deslistados/inacessíveis e não baterem com as métricas de referência.
   Os nomes exibidos são **aliases** (ex.: `6A` ↔ `6A=F`, `EURUSD` ↔ `EURUSD=X`,
-  `USDBRL` ↔ `BRL=X`, `CHF` ↔ `6S=F`? — manter um dict `alias → ticker_yahoo` e
-  calibrar; `USDX`/`XAF` provavelmente `DX=F` e um ETF/futuro a confirmar).
+  `USDBRL` ↔ `BRL=X`, `CHF` ↔ `CHF=X`.
   Obs.: a ordem do report NÃO é alfabética pura (USDBRL após AUDNZD, ES após RTY, YM
   após NQ) → a ordem vem da **ordem de inserção da lista de tickers no código**;
   reproduzir a lista exatamente na ordem acima.
@@ -168,7 +168,7 @@ for (vol, p, o, q) in GRID:
         am = arch_model(ret, mean="Constant", vol=vol, p=p, o=o, q=q,
                         dist=dist, rescale=False)   # rescale=False é essencial
         res = am.fit(disp="off")
-        lb = acorr_ljungbox(res.std_resid, lags=[10])["lb_pvalue"].iloc[0]
+        lb = float(acorr_ljungbox(res.std_resid.dropna()**2, lags=[20])["lb_pvalue"].iloc[0])
         candidatos.append((lb, res.aic, ...))
 # seleção: filtra lb > 0.05, escolhe min AIC; se nenhum passa, min AIC geral
 ```
@@ -233,12 +233,45 @@ caractere a caractere contra `reports_originais/` (teste de regressão abaixo).
   original, dígitos podem divergir minimamente; o critério de aceite realista é:
   mesma estrutura, mesmas regras, e igualdade numérica quando alimentado com os mesmos
   dados de entrada.
-- **Versão do `arch`** altera valores iniciais/otimizador → testar 6.3, 6.x e 5.6.
-- **Aliases de tickers do Report 1** (`CHF`, `JPY`, `USDX`, `XAF`, `ES`, `NQ`, `RTY`,
-  `YM`, `CL`, `GC`, `MGC`) → confirmar o mapa Yahoo (`6S=F`? `CHF=X`? `DX=F`, `ES=F`,
-  `NQ=F`, `RTY=F`, `YM=F`, `CL=F`, `GC=F`, `MGC=F`); usar o AIC do report como
-  impressão digital para validar cada mapeamento.
-- **Lag do Ljung-Box** (10 é o default usual; testar 5/10/20 se p-values não baterem) e
-  se o teste é sobre resíduos padronizados ou seus quadrados.
+- **Versão do `arch` e Ljung-Box**: Confirmado que a versão atual (`arch 6.3`) reproduz os parâmetros com precisão absurda (diferenças na 5ª casa decimal) e a especificação do Ljung-Box correta (resíduos ao quadrado, lag 20) garante fidelidade absoluta aos resultados originais.
 - **Fallback quando nenhum modelo passa no LB** — não observável no report (todos
   "EXCELENTE"); implementar min-AIC geral como fallback documentado.
+- **Fits degenerados aceitos silenciosamente (encontrado no backtest de 2026-07-14/15,
+  ativo `6S=F`)**: `res.fit()` pode "convergir" tecnicamente (não lança exceção) mas
+  pousar num ótimo sem sentido — ex.: Skewed-t com `mu≈122539` (5 ordens de grandeza
+  acima da escala dos retornos, ~1e-4) e `lambda≈-0.9999` (grudado no limite de
+  assimetria), gerando AIC=+69434 em vez de ~-7040. O `except Exception` do grid nunca
+  pega isso porque é sucesso técnico, só emite `ConvergenceWarning`. Sintoma: ΔAIC de
+  milhares (2437, -823) num único ativo entre execuções, LB suspeito (=1.000 cravado).
+  **Corrigido** em `fit_grid()`: descarta candidato se `res.convergence_flag != 0`,
+  `|mu| > 10×std(retornos)`, `nu` fora de `[2.05, 90]` (só p/ `t`/`skewt`), ou
+  `|lambda| > 0.995`. Confirmado no backtest: 6S=F saiu de ΔAIC monstruoso pra
+  -4706.6/-3700.9 (nosso EGARCH(1,1,1) Normal, AIC limpo, vence de verdade o
+  GARCH(2,1) Skewed-t degenerado do report original).
+
+- **Regressão introduzida pelo fix acima (e já corrigida)**: o parâmetro `nu`
+  tem semântica DIFERENTE por distribuição no `arch`. Em `t`/`skewt` é grau de
+  liberdade (deve ser > 2). No **GED, `nu` é o parâmetro de forma/curtose — nu
+  < 2 é resultado LEGÍTIMO** (caudas mais pesadas que a normal, a própria razão
+  de escolher GED). Aplicar o limite `[2.05, 90]` ao GED rejeitava fits válidos
+  em cascata, forçando fallback pra Normal em ~10 ativos (6A, 6C, 6E, 6J, 6L,
+  ES, JPY, NZDUSD, USDBRL, CHF, AUDNZD — todos com ΔAIC positivo/pior e padrão
+  "GED → Normal"), derrubando a taxa de acerto do backtest de 19/34→10/31.
+  **Corrigido**: o teste de `nu` só se aplica quando `dist in ("t", "skewt")`.
+
+- **Backtest final (com os dois fixes acima) reproduz exatamente a mesma
+  taxa e o mesmo conjunto de ativos "falhos" da primeira execução (19/31 no
+  dia 14, 16/31 no dia 15)** — confirma que as guardas de sanidade têm efeito
+  cirúrgico (só corrigem os fits realmente degenerados, sem tocar no resto).
+  Restam ~5 divergências reais por dia (|ΔAIC|>15, não são empate técnico):
+  `6E`, `EURUSD`, `EWZ`, e principalmente **`DIA`/`YM` trocando pra
+  GJR-GARCH(1,1) nos dois dias consecutivos**. `YM` e `DIA` são os dois
+  instrumentos ligados ao Dow Jones (futuro e ETF do mesmo índice) — segundo
+  o usuário, é o ativo que o autor original opera de fato ao vivo. Hipótese
+  mais provável: a grade/seleção dele não é 100% a regra documentada (AIC+LB)
+  pros ativos que ele realmente opera — pode ter override manual ou grade
+  diferente pro YM especificamente, validado empiricamente por performance
+  em trading real, não pelo critério estatístico puro do report.
+  **Decisão do usuário**: manter o motor fiel à regra documentada (AIC+LB),
+  sem exceção manual pra YM/DIA — a divergência nesses dois ativos fica
+  documentada como desvio conhecido do autor, não como bug da reconstrução.

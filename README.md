@@ -1,58 +1,34 @@
-# stat01-xtr — Reconstrução dos Reports GARCH
+# ASG Hybrid HFT & Vision Agent (IBOVESPA)
 
-Engenharia reversa + reimplementação dos dois reports estatísticos originais.
+## 🎯 Objetivo do Projeto
+Este repositório contém a infraestrutura e os estudos microestruturais para a criação de um Agente Híbrido (Quantitativo + Visão Computacional) voltado para operações Day Trade no IBOVESPA (B3). O sistema mescla análise de risco macroeconômico (Ouro - XAUUSD) com o fluxo de ordens intradiário (Tape Reading) do painel A.S.G.
 
-## Estrutura
+## 📊 1. Fundamentos Quantitativos e Estatísticos (Macro Lead-Lag)
+A fundação matemática deste projeto baseia-se na correlação de risco global entre Ativos de Risco (IBOVESPA) e Ativos de Proteção (Ouro/XAUUSD).
+* **Banda GARCH D1**: Modelamos a volatilidade diária do IBOVESPA usando Filtro de Kalman e modelo GARCH(1,1). Só buscamos operações nas faixas extremas de distorção estatística.
+* **O Veto Macro (Filtro Anti-Armadilha)**: Se o IBOVESPA apresenta um sinal de colapso estrutural (venda forte), o Ouro **DEVE** subir (confirmando a fuga global de capital para segurança). Se o IBOV cai e o Ouro fica estático ou cai junto, a queda do IBOV é uma *Armadilha Institucional (Caça de Stops)*. O modelo quantitativo VETA a venda.
 
-```
-stat01-xtr/
-├── config.py            # listas de ativos, aliases, classes, datas
-├── data.py              # download via yfinance + retornos log (com cache CSV)
-├── interpretacao.py     # regras de interpretação automática (seção 1.7 do plano)
-├── render.py            # formatação fixed-width dos dois reports
-├── egarch_forecast.py   # Report 2: EGARCH(1,1)-t, previsão 1d, bandas 95%
-├── garch_analyzer.py    # Report 1: grade de modelos, seleção LB/AIC, render
-├── validate.py          # teste de regressão (diff contra reports_originais/)
-├── requirements.txt
-└── reports_originais/   # arquivos de referência
-```
+## 👁️ 2. A Física Microestrutural e o Playbook A.S.G
+A segunda camada do nosso modelo não lê preços em gráficos, mas lê a dinâmica de leilão via Visão Computacional do painel A.S.G (Ajuste, Micro, Macro, Maker).
+Através da dissecação de horas de pregão gravado, isolamos dois *Paretos* (Padrões Ouro):
+* **A Ignição**: O preço rompe e se sustenta acima da Linha Azul (Ajuste). Simultaneamente, o fluxo Micro (curto prazo) ganha tração junto com a agressão do Maker (Smart Money). 
+* **A Absorção (Exaustão Institucional)**: Os velocímetros de fluxo apontam exaustão compradora máxima, mas o preço resulta em um pavio (wick) sem romper a resistência. O lote institucional passivo absorveu toda a agressão do varejo, antecedendo um desabamento.
 
-## Setup rápido
+> 📝 **Nota de Auditoria (Pregão de 03/07/2026):**  
+> Os estudos visuais homologados neste projeto foram extraídos da gravação do pregão do dia **03/07/2026**.  
+> **Aviso Crítico sobre Dados Quantitativos:** Na etapa de cruzamento de dados (Backtest Quantitativo), constatamos que a fonte primária (Yahoo Finance) reportou dados nulos (`NaN`) para o ativo Ouro (XAUUSD) durante a sessão intradiária deste dia específico. O motivo isolado foi o feriado bancário/bolsa nos Estados Unidos (Independence Day observado no dia 3 de julho, já que dia 4 caiu no fim de semana). Por este motivo, o Backtest Matemático do GARCH excluiu este dia, reforçando a superioridade e a necessidade da camada Visual (o Veredito de Visão) capturando a dinâmica real da corretora no momento em que a anomalia ocorreu, independentemente de falhas em APIs de dados de terceiros.
+## ⚙️ 3. Arquitetura Tecnológica do Agente Híbrido
+Não enviamos os cálculos para dentro da infraestrutura pesada do MetaTrader/MQL5. Construímos um pipeline assíncrono e resiliente em Python:
+1. **Captura HFT**: Utiliza a biblioteca mss e pygetwindow para focar exclusivamente na janela de transmissão (Zoom) do painel ASG, extraindo frames em milissegundos direto para a memória RAM.
+2. **AI Detector**: Envia os frames em Base64 comprimido para a API da **NVIDIA NIM** rodando o modelo open-weight Llama 3.2 Vision Instruct (11b). A IA aplica as regras do Playbook.
+3. **Resiliência**: Conta com *Exponential Backoff* de rede e Fallbacks paramétricos contra minimização de janelas e alucinação de JSON.
 
-```bash
-python -m venv venv && source venv/bin/activate   # Linux/Mac
-# ou: venv\Scripts\activate                        # Windows
-pip install -r requirements.txt
-mkdir cache
-```
+## 📁 Estrutura do Repositório (Documentação e Logs)
+* /vision_agent: Código-fonte do motor de visão computacional em Python.
+* /docs/ASG_Playbook.md: Transcrição refinada das regras originais do operacional ASG.
+* /docs/ASG_Trap_Analysis.md: Estudo visual dos Frames 29 (Absorção) e 98 (Ignição).
+* /docs/System_Architecture.md: Diagrama de Fluxo (Mermaid) do sistema computacional.
+* /frames_extraidos.zip: Banco de imagens cru (Ground Truth) para treinamento e auditoria do Agente de Visão.
 
-## Validação rápida (Fase 1 — Report 2)
-
-```bash
-# Gera o report e imprime no stdout:
-python egarch_forecast.py
-
-# Compara com o original (ignora linhas de data/hora):
-python validate.py --phase 1
-
-# Salva arquivo de saída:
-python egarch_forecast.py --save
-```
-
-## Validação completa (Fase 2 — Report 1, ~10-20 min)
-
-```bash
-# Subset rápido para calibração inicial:
-python garch_analyzer.py --tickers AAPL GC ^VIX EURUSD
-
-# Grade completa:
-python garch_analyzer.py --save
-python validate.py --phase 2
-```
-
-## Pontos de calibração (ver PLANO_RECONSTRUCAO.md §5)
-
-- Se α/β travarem em 0.05/0.93 → confirmar `rescale=False` + versão do `arch`
-- Cache em `cache/` garante determinismo; delete para forçar re-download
-- Aliases `CHF`, `JPY`, `USDX`, `XAF` podem precisar ajuste no `config.py`
-- Lag do Ljung-Box: testar 5/10/20 se p-values divergirem
+---
+*Projeto auditável. Desenvolvido para execução assistida e validação cruzada.*

@@ -25,7 +25,7 @@ GRID = (
 )
 DISTS = ["normal", "t", "skewt", "ged"]
 
-LB_LAG = 10  # calibrar contra reports_originais se necessário
+LB_LAG = 20  # calibrado: autor usou lag=20 nos quadrados (ARCH effect)
 
 
 def _model_label(vol: str, p: int, o: int, q: int) -> str:
@@ -53,12 +53,67 @@ def _extract_params(res) -> tuple[float, float, float, float]:
     return omega, alpha, beta, gamma
 
 
+def _sane(res, dist, ret_scale) -> bool:
+    """Guarda de sanidade compartilhada: rejeita fits 'tecnicamente bem
+    sucedidos' mas numericamente degenerados (o otimizador não levanta
+    exceção ao pousar num limite/mínimo ruim, só emite warning)."""
+    if getattr(res, "convergence_flag", 0) != 0:
+        return False  # scipy reportou não-convergência real
+    mu_val = float(res.params.get("mu", 0.0))
+    if ret_scale > 0 and abs(mu_val) > 10 * ret_scale:
+        return False  # média disparada — sinal de otimização perdida
+    # "nu" tem significado DIFERENTE por distribuição no `arch`: em t/skewt
+    # é grau de liberdade (deve ser > 2 p/ variância finita — nu perto de 2
+    # ou muito alto É degenerado). No GED, "nu" é o parâmetro de FORMA/
+    # curtose — nu < 2 é um resultado LEGÍTIMO (caudas mais pesadas que a
+    # normal, a própria razão de escolher GED).
+    nu_val = res.params.get("nu")
+    if nu_val is not None and dist in ("t", "skewt") and not (2.05 <= nu_val <= 90):
+        return False  # graus de liberdade grudados no limite do otimizador
+    lam_val = res.params.get("lambda")
+    if lam_val is not None and abs(lam_val) > 0.995:
+        return False  # assimetria da Skewed-t grudada no limite ±1
+    return True
+
+
+def _warm_start_vector(am, anchor_params):
+    """
+    Monta o vetor de partida para o modelo-alvo `am` casando por NOME de
+    parâmetro com o fit-âncora `anchor_params` (Series do GARCH(1,1) do
+    mesmo `dist`). Parâmetros extras que só existem no alvo (ex.:
+    alpha[2], beta[2], gamma[1] do GJR) ficam com o chute default do
+    próprio `arch`, obtido via dry-run (`maxiter=0`) — mais robusto do
+    que montar o vetor por POSIÇÃO hardcoded: não depende de premissa
+    sobre a ordem interna dos parâmetros, que pode variar por modelo/
+    distribuição/versão do `arch`.
+
+    Sem warm-start, o SciPy (nesta versão do `arch`) some no vazio pra
+    p>1 ou q>1: fica cego sem um chute inicial perto da solução e
+    converge pra um mínimo local muito pior (confirmado no ^BVSP:
+    GARCH(1,2) sem warm-start cai em AIC=-3279; com warm-start do
+    GARCH(1,1), AIC=-6287, batendo o valor histórico do report original).
+    """
+    probe = am.fit(disp="off", show_warning=False, options={"maxiter": 0})
+    sv = probe.params.copy()
+    for name in sv.index:
+        if name in anchor_params.index:
+            sv[name] = anchor_params[name]
+    return sv.values
+
+
 def fit_grid(ret, alias: str, classe: str) -> dict | None:
     """
     Testa toda a grade (GRID × DISTS), aplica critério LB/AIC,
     devolve dict pronto para render_report1.
+
+    Para a família GARCH/GJR (o<=1), usa warm-start em cascata: ajusta
+    GARCH(1,1) primeiro por distribuição e usa o resultado como chute
+    inicial dos modelos de ordem maior — necessário pra evitar que o
+    otimizador se perca em superfícies com p>1 ou q>1 (ver _warm_start_vector).
     """
     candidatos = []
+    ret_scale = float(ret.std())
+    ancoras: dict[str, "object"] = {}  # dist -> res do GARCH(1,1) (se sadio)
 
     for (vol, p, o, q) in GRID:
         for dist in DISTS:
@@ -68,9 +123,27 @@ def fit_grid(ret, alias: str, classe: str) -> dict | None:
                     p=p, o=o, q=q, dist=dist,
                     rescale=False,  # ESSENCIAL: manter retornos sem reescala
                 )
-                res = am.fit(disp="off", show_warning=False)
+
+                sv = None
+                if vol == "GARCH" and (p, o, q) != (1, 0, 1) and dist in ancoras:
+                    try:
+                        sv = _warm_start_vector(am, ancoras[dist].params)
+                    except Exception:
+                        sv = None  # dry-run falhou — cai pro chute default normal
+
+                if sv is not None:
+                    res = am.fit(disp="off", show_warning=False, starting_values=sv)
+                else:
+                    res = am.fit(disp="off", show_warning=False)
+
+                if not _sane(res, dist, ret_scale):
+                    continue
+
+                if vol == "GARCH" and (p, o, q) == (1, 0, 1):
+                    ancoras[dist] = res  # guarda a âncora sadia pra próxima iteração
+
                 lb_pval = float(
-                    acorr_ljungbox(res.std_resid, lags=[LB_LAG])["lb_pvalue"].iloc[0]
+                    acorr_ljungbox(res.std_resid.dropna()**2, lags=[LB_LAG])["lb_pvalue"].iloc[0]
                 )
                 candidatos.append({
                     "lb": lb_pval,
@@ -121,6 +194,9 @@ def run(assets: list[tuple] | None = None, save: bool = False) -> str:
     assets = assets or ASSETS_R1
     resultados = []
     for alias, ticker, classe in assets:
+        if ticker is None:
+            print(f"    [SKIP] {alias}: ticker Yahoo não identificado (ver config.py)")
+            continue
         print(f"  Processando {alias} ({ticker}) ...", flush=True)
         try:
             _, ret = get_returns(ticker, scale100=False)
@@ -132,8 +208,8 @@ def run(assets: list[tuple] | None = None, save: bool = False) -> str:
 
     report = render_report1(resultados)
     if save:
-        from datetime import date
-        fname = f"ANALISE_GARCH_COMPLETO_{date.today()}.txt"
+        from config import REPORT_DATE
+        fname = f"ANALISE_GARCH_COMPLETO_{REPORT_DATE}.txt"
         with open(fname, "w", encoding="utf-8") as fh:
             fh.write(report)
         print(f"[garch_analyzer] Salvo em {fname}")

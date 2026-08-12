@@ -1,8 +1,16 @@
 # Fixar versões é crítico para reproduzir dígitos (ver PLANO_RECONSTRUCAO.md §2)
-# Testar arch 6.3 primeiro; se parâmetros divergirem, tentar arch 5.6
+#
+# arch: 6.3 reproduz os parâmetros do report original a ~3 casas decimais
+# (α/β do GC batem com a referência). NÃO usar arch 5.6: além de não trazer
+# ganho (otimizador estável entre versões), o setup.py da 5.6 quebra em
+# Python 3.12 (importa pkg_resources removido do build). Requer Python <=3.10.
 arch>=6.3,<7
 yfinance>=0.2.40
-statsmodels>=0.14
+# statsmodels 0.14.0 tem bug interno: diagnostic.py usa @deprecate_kwarg com
+# assinatura incompatível e quebra no import de acorr_ljungbox
+# (TypeError: deprecate_kwarg() missing 'new_arg_name'). Corrigido a partir
+# da 0.14.1 — NÃO editar o site-packages, apenas fixar a versão aqui.
+statsmodels>=0.14.1
 pandas>=2.0
 numpy>=1.26
 scipy>=1.12

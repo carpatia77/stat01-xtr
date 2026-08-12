@@ -1,11 +1,21 @@
 """
 config.py — listas de ativos, aliases, classes, datas
 """
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
+import os
 
 # ── Datas ──────────────────────────────────────────────────────────────────────
-END_DATE   = date.today()
-START_DATE = END_DATE - timedelta(days=1460)  # 4 anos corridos
+# Fixado em 2026-07-17 para bater com os reports_originais/ usados como
+# referência de regressão. Para gerar reports novos em outra data, sobrescreva
+# REPORT_DATE (ex.: variável de ambiente) antes de importar este módulo.
+env_date = os.environ.get("GARCH_REPORT_DATE")
+if env_date:
+    REPORT_DATE = datetime.strptime(env_date, "%Y-%m-%d").date()
+else:
+    REPORT_DATE = date(2026, 7, 17)
+
+END_DATE    = REPORT_DATE
+START_DATE  = END_DATE - timedelta(days=1460)  # 4 anos corridos
 
 # ── Report 2 — 19 tickers Yahoo (ordem alfabética do report original) ──────────
 TICKERS_R2 = [
@@ -30,7 +40,7 @@ ASSETS_R1 = [
     ("AUDNZD",   "AUDNZD=X",  "AÇÃO"),   # mapeado como AÇÃO no código original
     ("USDBRL",   "BRL=X",     "FOREX"),
     ("BTC-USD",  "BTC-USD",   "AÇÃO"),
-    ("CHF",      "6S=F",      "FUTUROS"),  # alias alternativo — calibrar
+    ("CHF",      "CHF=X",     "FOREX"),   # spot USD/CHF — 6S=F já usado pelo alias "6S"
     ("CL",       "CL=F",      "FUTUROS"),
     ("DIA",      "DIA",       "AÇÃO"),
     ("DX-Y.NYB", "DX-Y.NYB",  "AÇÃO"),   # mapeado como AÇÃO no original
@@ -38,7 +48,7 @@ ASSETS_R1 = [
     ("EWZ",      "EWZ",       "AÇÃO"),
     ("GC",       "GC=F",      "FUTUROS"),
     ("GOOGL",    "GOOGL",     "AÇÃO"),
-    ("JPY",      "6J=F",      "FUTUROS"),  # alias alternativo
+    ("JPY",      "JPY=X",     "FOREX"),   # spot USD/JPY — 6J=F já usado pelo alias "6J"
     ("RTY",      "RTY=F",     "FUTUROS"),
     ("ES",       "ES=F",      "FUTUROS"),
     ("MGC",      "MGC=F",     "FUTUROS"),
@@ -47,9 +57,8 @@ ASSETS_R1 = [
     ("NVDA",     "NVDA",      "AÇÃO"),
     ("NZDUSD",   "NZDUSD=X",  "AÇÃO"),   # mapeado como AÇÃO no original
     ("TSLA",     "TSLA",      "AÇÃO"),
-    ("USDX",     "DX-Y.NYB",  "AÇÃO"),   # AÇÃO VOLÁTIL no original
-    ("XAF",      "DX=F",      "FUTUROS"), # a confirmar — calibrar pelo AIC
+
     ("^BVSP",    "^BVSP",     "AÇÃO"),
     ("^VIX",     "^VIX",      "AÇÃO"),
-    # ("^VVIX",  "^VVIX",     "AÇÃO"),  # 34.º se presente no report
+    ("^VVIX",    "^VVIX",     "AÇÃO"),
 ]
